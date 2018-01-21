@@ -1,26 +1,22 @@
 package com.springbatch.example.config;
 
-import com.springbatch.example.domain.Person;
-import com.springbatch.example.job.JobCompletionNotificationListener;
-import com.springbatch.example.job.PersonItemProcessor;
+import com.springbatch.example.domain.Player;
+import com.springbatch.example.processor.Step1Processor;
+import com.springbatch.example.processor.Step2Processor;
+import com.springbatch.example.reader.Step1Reader;
+import com.springbatch.example.reader.Step2Reader;
+import com.springbatch.example.writer.Step2Writer;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
 import org.springframework.batch.core.configuration.annotation.EnableBatchProcessing;
 import org.springframework.batch.core.configuration.annotation.JobBuilderFactory;
 import org.springframework.batch.core.configuration.annotation.StepBuilderFactory;
-import org.springframework.batch.core.launch.support.RunIdIncrementer;
-import org.springframework.batch.item.database.BeanPropertyItemSqlParameterSourceProvider;
-import org.springframework.batch.item.database.JdbcBatchItemWriter;
-import org.springframework.batch.item.file.FlatFileItemReader;
-import org.springframework.batch.item.file.mapping.BeanWrapperFieldSetMapper;
-import org.springframework.batch.item.file.mapping.DefaultLineMapper;
-import org.springframework.batch.item.file.transform.DelimitedLineTokenizer;
+import org.springframework.batch.core.listener.ExecutionContextPromotionListener;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.io.ClassPathResource;
 
-import javax.sql.DataSource;
+import java.util.List;
 
 /**
  * Created by hongjong-wan on 2017. 9. 13..
@@ -29,66 +25,72 @@ import javax.sql.DataSource;
 @EnableBatchProcessing
 public class BatchConfiguration {
 
-    @Autowired
-    public JobBuilderFactory jobBuilderFactory;
+    private static final String JOB_NAME = "job";
+    private static final String STEP1_NAME = "sendGameScheduleStep";
+    private static final String STEP2_NAME = "removePlayerStep";
+    private static final int CHUNK_SIZE = 10;
 
     @Autowired
-    public StepBuilderFactory stepBuilderFactory;
+    private JobBuilderFactory jobBuilderFactory;
 
     @Autowired
-    public DataSource dataSource;
+    private StepBuilderFactory stepBuilderFactory;
 
-    // ItemReader, ItemProcessor, ItemWriter
-    @Bean
-    public FlatFileItemReader<Person> reader() {
-        FlatFileItemReader<Person> reader = new FlatFileItemReader<Person>();
-        reader.setResource(new ClassPathResource("sample-data.csv"));
-        reader.setLineMapper(new DefaultLineMapper<Person>() {{
-            setLineTokenizer(new DelimitedLineTokenizer() {{
-                setNames(new String[] { "firstName", "lastName" });
-            }});
-            setFieldSetMapper(new BeanWrapperFieldSetMapper<Person>() {{
-                setTargetType(Person.class);
-            }});
-        }});
-        return reader;
-    }
+    @Autowired
+    private Step1Reader step1Reader;
+    @Autowired
+    private Step1Processor step1Processor;
+
+
+    @Autowired
+    private Step2Reader step2Reader;
+    @Autowired
+    private Step2Processor step2Processor;
+    @Autowired
+    private Step2Writer step2Writer;
 
     @Bean
-    public PersonItemProcessor processor() {
-        return new PersonItemProcessor();
-    }
-
-    @Bean
-    public JdbcBatchItemWriter<Person> writer() {
-        JdbcBatchItemWriter<Person> writer = new JdbcBatchItemWriter<Person>();
-        writer.setItemSqlParameterSourceProvider(new BeanPropertyItemSqlParameterSourceProvider<Person>());
-        writer.setSql("INSERT INTO people (first_name, last_name) VALUES (:firstName, :lastName)");
-        writer.setDataSource(dataSource);
-        return writer;
-    }
-
-
-    // job definition
-    @Bean
-    public Job importUserJob(JobCompletionNotificationListener listener) {
-        return jobBuilderFactory.get("importUserJob")
-                .incrementer(new RunIdIncrementer())
-                .listener(listener)
-                .flow(step1())
-                .end()
+    public Job job() {
+        return jobBuilderFactory.get(JOB_NAME)
+                .start(sendGameScheduleStep()) // 1번째 step
+                .next(removePlayerStep()) // 2번째 step
                 .build();
     }
 
-    // step definition
+    // 방출 맴버를 제외한 모든 멤버들에게 게임 일정에 관한 메일 발송
     @Bean
-    public Step step1() {
-        return stepBuilderFactory.get("step1")
-                .<Person, Person> chunk(10)
-                .reader(reader())
-                .processor(processor())
-                .writer(writer())
+    public Step sendGameScheduleStep() {
+        return stepBuilderFactory.get(STEP1_NAME)
+                .<List<Player>, Player>chunk(CHUNK_SIZE)
+                .reader(step1Reader)
+                .processor(step1Processor)
+                .listener(promotionListener())
+//                .taskExecutor(taskExecutor)
+//                .throttleLimit(THROTTLE_LIMIT)
                 .build();
     }
-    // end::jobstep[]
+
+
+    // 방출 멤버를 제외한 맴버 등록
+    @Bean
+    public Step removePlayerStep() {
+        return stepBuilderFactory.get(STEP2_NAME)
+                .<List<Player>, List<Player>>chunk(CHUNK_SIZE)
+                .reader(step2Reader)
+                .processor(step2Processor)
+                .writer(step2Writer)
+                .listener(promotionListener())
+                .build();
+    }
+
+    @Bean
+    public ExecutionContextPromotionListener promotionListener() {
+        ExecutionContextPromotionListener executionContextPromotionListener = new ExecutionContextPromotionListener();
+        // 데이터 공유를 위해서는 사용될 key를 미리 빈에 등록해줘야 한다.
+        executionContextPromotionListener.setKeys(new String[]{"STAR_MEMBER"});
+
+        return executionContextPromotionListener;
+    }
+
+
 }

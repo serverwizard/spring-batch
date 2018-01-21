@@ -38,4 +38,7 @@ dependencies {
 	runtime('org.springframework.boot:spring-boot-devtools')
 	compile('org.springframework.boot:spring-boot-starter-tomcat')
 	testCompile('org.springframework.boot:spring-boot-starter-test')
+	compile('org.projectlombok:lombok')
+
+
 }
