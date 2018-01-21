@@ -1,9 +1,5 @@
 package com.springbatch.example.domain;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.ToString;
-
 /**
  * Created by hongjong-wan on 2018. 1. 20..
  */

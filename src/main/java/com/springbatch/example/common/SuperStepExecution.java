@@ -16,6 +16,7 @@ public class SuperStepExecution<T> {
         if (key == null || player == null) throw new NullPointerException();
 
         JobExecution jobExecution = stepExecution.getJobExecution();
+
         ExecutionContext executionContext = jobExecution.getExecutionContext();
         executionContext.put(key, player);
     }

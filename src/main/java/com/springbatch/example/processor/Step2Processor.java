@@ -7,25 +7,30 @@ import org.springframework.batch.core.annotation.BeforeStep;
 import org.springframework.batch.item.ItemProcessor;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
  * Created by hongjong-wan on 2018. 1. 20..
  */
 @Component
-public class Step2Processor extends SuperStepExecution<Player> implements ItemProcessor<List<Player>, List<Player>> {
+public class Step2Processor extends SuperStepExecution<Player> implements ItemProcessor<Player, List<Player>> {
 
     private Player removePlayer;
 
+    private List<Player> players = new ArrayList<>();
+
     @Override
-    public List<Player> process(List<Player> item) throws Exception {
+    public List<Player> process(Player item) throws Exception {
 
 
         System.out.println(" 방출 선수 : " + removePlayer + "\n");
 
-        item.remove(removePlayer);
+//       item.remove(removePlayer);
 
-        return item;
+        players.add(item);
+
+        return players;
 
     }
 

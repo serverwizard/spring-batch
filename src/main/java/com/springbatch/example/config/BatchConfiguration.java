@@ -28,7 +28,7 @@ public class BatchConfiguration {
     private static final String JOB_NAME = "job";
     private static final String STEP1_NAME = "sendGameScheduleStep";
     private static final String STEP2_NAME = "removePlayerStep";
-    private static final int CHUNK_SIZE = 10;
+    private static final int CHUNK_SIZE = 3;
 
     @Autowired
     private JobBuilderFactory jobBuilderFactory;
@@ -65,8 +65,6 @@ public class BatchConfiguration {
                 .reader(step1Reader)
                 .processor(step1Processor)
                 .listener(promotionListener())
-//                .taskExecutor(taskExecutor)
-//                .throttleLimit(THROTTLE_LIMIT)
                 .build();
     }
 
@@ -75,7 +73,7 @@ public class BatchConfiguration {
     @Bean
     public Step removePlayerStep() {
         return stepBuilderFactory.get(STEP2_NAME)
-                .<List<Player>, List<Player>>chunk(CHUNK_SIZE)
+                .<Player, List<Player>>chunk(CHUNK_SIZE)
                 .reader(step2Reader)
                 .processor(step2Processor)
                 .writer(step2Writer)
